@@ -1004,3 +1004,56 @@ tbody td { padding: 10px 12px; font-size: 13px; vertical-align: middle; }
   color: var(--text3);
   text-transform: uppercase;
 }
+
+/* --- Department Groups (User Management) --- */
+.dept-group { margin-bottom: 8px; }
+
+/* --- Empty State --- */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text3);
+}
+.empty-state .empty-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+.empty-state p { font-size: 13px; }
+
+/* --- Action row in cards --- */
+.card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* --- Evaluation grid --- */
+.ev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
+/* --- Confirm dialog --- */
+.confirm-msg {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+/* --- User card inline edit --- */
+.uc .uc-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* --- Smooth transitions on interactive cards --- */
+.meet, .obj, .ev, .uc, .st {
+  transition: border-color .15s, transform .12s, box-shadow .15s;
+}
+
+/* --- Print styles --- */
+@media print {
+  .sb, .mn-hd, .btn, .hd-acts, .mdl-ov { display: none !important; }
+  .mn { margin-left: 0 !important; }
+  .pg-ct { padding: 10px !important; }
+  .card { break-inside: avoid; }
+}

@@ -283,6 +283,22 @@ const DB = {
   /* ---- Departments ---- */
   getDepts() { return this._rows("SELECT * FROM departments"); },
   getDept(id) { return this._row("SELECT * FROM departments WHERE id = ?", [id]); },
+  createDept(d) {
+    this._run("INSERT INTO departments (id,name,type,icon,color,parent) VALUES (?,?,?,?,?,?)",
+      [d.id, d.name, d.type, d.icon || '', d.color || '#2563EB', d.parent || null]);
+  },
+  updateDept(id, d) {
+    this._run("UPDATE departments SET name=?,type=?,icon=?,color=?,parent=? WHERE id=?",
+      [d.name, d.type, d.icon || '', d.color || '#2563EB', d.parent || null, id]);
+  },
+  deleteDept(id) {
+    // Check for users and child depts
+    const users = this.getUsersByDept(id);
+    const children = this._rows("SELECT id FROM departments WHERE parent = ?", [id]);
+    if (users.length || children.length) return false;
+    this._run("DELETE FROM departments WHERE id = ?", [id]);
+    return true;
+  },
 
   getChildDeptIds(parentId) {
     const children = this._rows("SELECT id FROM departments WHERE parent = ?", [parentId]);
@@ -295,7 +311,35 @@ const DB = {
   getUsers() { return this._rows("SELECT * FROM users ORDER BY name"); },
   getUser(id) { return this._row("SELECT * FROM users WHERE id = ?", [id]); },
   getUsersByDept(deptId) { return this._rows("SELECT * FROM users WHERE dept = ? ORDER BY name", [deptId]); },
+  getNextUserId() {
+    const r = this._row("SELECT COALESCE(MAX(id),0)+1 as nid FROM users");
+    return r ? r.nid : 1;
+  },
 
+  createUser(d) {
+    const av = (d.name || '').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const colors = ['#2563EB','#0D9488','#DC2626','#D97706','#7C3AED','#EC4899','#EA580C','#F43F5E','#059669'];
+    const color = d.color || colors[Math.floor(Math.random() * colors.length)];
+    const id = this.getNextUserId();
+    this._run("INSERT INTO users (id,name,email,role,dept,avatar,color,position) VALUES (?,?,?,?,?,?,?,?)",
+      [id, d.name, d.email, d.role || 'Usuario', d.dept, av, color, d.position || '']);
+    return id;
+  },
+  updateUser(id, d) {
+    const av = (d.name || '').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    this._run("UPDATE users SET name=?,email=?,role=?,dept=?,avatar=?,color=?,position=? WHERE id=?",
+      [d.name, d.email, d.role, d.dept, av, d.color || '#2563EB', d.position || '', id]);
+  },
+  deleteUser(id) {
+    // Check dependencies
+    const acts = this._row("SELECT COUNT(*) as c FROM activities WHERE responsible = ?", [id]);
+    if (acts && acts.c > 0) return { ok: false, reason: 'Tiene actividades asignadas (' + acts.c + ')' };
+    const evals = this._row("SELECT COUNT(*) as c FROM evaluations WHERE user_id = ?", [id]);
+    if (evals && evals.c > 0) return { ok: false, reason: 'Tiene evaluaciones registradas (' + evals.c + ')' };
+    db.run("DELETE FROM meeting_participants WHERE user_id = ?", [id]);
+    this._run("DELETE FROM users WHERE id = ?", [id]);
+    return { ok: true };
+  },
   changeUserRole(userId, newRole) {
     this._run("UPDATE users SET role = ? WHERE id = ?", [newRole, userId]);
   },
@@ -323,6 +367,36 @@ const DB = {
   /* ---- Processes ---- */
   getProcesses() { return this._rows("SELECT * FROM processes ORDER BY id"); },
   getProcess(id) { return this._row("SELECT * FROM processes WHERE id = ?", [id]); },
+  createProcess(d) {
+    this._run("INSERT INTO processes (name,code,dept,status,description) VALUES (?,?,?,?,?)",
+      [d.name, d.code || '', d.dept, d.status || 'Activo', d.description || '']);
+  },
+  updateProcess(id, d) {
+    this._run("UPDATE processes SET name=?,code=?,dept=?,status=?,description=? WHERE id=?",
+      [d.name, d.code || '', d.dept, d.status || 'Activo', d.description || '', id]);
+  },
+  deleteProcess(id) {
+    const acts = this._row("SELECT COUNT(*) as c FROM activities WHERE process_id = ?", [id]);
+    if (acts && acts.c > 0) return { ok: false, reason: 'Tiene actividades vinculadas (' + acts.c + ')' };
+    this._run("DELETE FROM processes WHERE id = ?", [id]);
+    return { ok: true };
+  },
+
+  /* ---- Export ---- */
+  exportCSV(table) {
+    const rows = this._rows("SELECT * FROM " + table);
+    if (!rows.length) return '';
+    const cols = Object.keys(rows[0]);
+    let csv = cols.join(',') + '\n';
+    rows.forEach(r => { csv += cols.map(c => '"' + String(r[c] || '').replace(/"/g, '""') + '"').join(',') + '\n'; });
+    return csv;
+  },
+  exportAllCSV() {
+    const tables = ['users','departments','activities','objectives','processes','meetings','evaluations'];
+    let all = '';
+    tables.forEach(t => { all += '=== ' + t.toUpperCase() + ' ===\n' + this.exportCSV(t) + '\n\n'; });
+    return all;
+  },
 
   /* ---- Activities ---- */
   getActivities() { return this._rows("SELECT * FROM activities ORDER BY id DESC"); },
